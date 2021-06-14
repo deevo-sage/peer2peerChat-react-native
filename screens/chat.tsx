@@ -9,15 +9,33 @@ import { useMutation, useSubscription } from "@apollo/react-hooks"
 import { subsciptionclient } from "../apollo"
 import useColorScheme from "../hooks/useColorScheme"
 import Colors from "../constants/Colors"
+import { useAsyncStorage } from "@react-native-async-storage/async-storage"
 type item = {
     message: { data: string, username: string, id: string, time: string }
 }
 const Chatroom = () => {
-    const color = useColorScheme()
+    const user = useAsyncStorage('username')
+    const room = useAsyncStorage('room')
+    const [username, setusername] = useState('')
+    const [roomcode, setroomcode] = useState('')
+
+    useEffect(() => {
+        user.getItem((err, res) => {
+            if (!err && res) {
+                setusername(res)
+            }
+        })
+        room.getItem((err, res) => {
+            if (!err && res) {
+                setroomcode(res)
+            }
+        })
+    }, [])
+
     const flatlist = useRef<FlatList>(null)
-    const [list, setlist] = useState<item[]>([{ message: { data: "sad", id: "123124", time: 'now', username: 'HelloKitty' } }, { message: { data: "sad nhi hu bro", id: "1213243124", time: 'now', username: 'HelloKitty' } }])
+    const [list, setlist] = useState<item[]>([])
     const sub = useSubscription<item>(subscribeRoom, {
-        variables: { roomID: '1234' },
+        variables: { roomID: roomcode },
         fetchPolicy: "network-only",
         shouldResubscribe: true,
         onSubscriptionComplete: () => console.log('comp'),
@@ -33,14 +51,14 @@ const Chatroom = () => {
         <View style={{ flexBasis: '90%', flex: 1, paddingTop: 10, display: 'flex', flexDirection: "column", justifyContent: 'flex-end' }}>
             <FlatList data={list}
                 ref={flatlist}
-
-                onContentSizeChange={() => { if (flatlist.current) flatlist.current.scrollToEnd({ animated: true }) }}
+                inverted={true}
+                // onContentSizeChange={() => { if (flatlist.current) flatlist.current.scrollToEnd({ animated: true }) }}
 
                 style={{ display: "flex" }}
                 keyExtractor={(item) => {
                     return `${item.message.id}`
                 }}
-                contentContainerStyle={{ justifyContent: 'flex-end' }}
+                contentContainerStyle={{ justifyContent: 'flex-end', flexDirection: 'column-reverse' }}
                 renderItem={(dat) => {
                     if (dat.index != 0 && list[dat.index - 1].message.username === dat.item.message.username) {
                         return <MessageWithoutUserName item={dat.item} />
@@ -50,12 +68,13 @@ const Chatroom = () => {
                 }} />
             {sub.error && <Text>Error...</Text>}
         </View>
-        <TakeInput />
+        <TakeInput username={username} roomcode={roomcode} />
 
     </KeyboardAvoidingView>
 }
 export default Chatroom;
-const TakeInput: React.FunctionComponent<{}> = () => {
+const TakeInput: React.FunctionComponent<{ username: string, roomcode: string }> = ({ username, roomcode }) => {
+    const scheme = useColorScheme()
     const [addmessage, mdaata] = useMutation(createmessage)
     const input = useRef<TextInput>(null)
     const [message, setmessage] = useState("")
@@ -63,6 +82,7 @@ const TakeInput: React.FunctionComponent<{}> = () => {
         <View style={{ flexBasis: '80%' }}>
             <Input
                 ref={input}
+                style={{ color: scheme === 'dark' ? 'white' : 'black' }}
                 placeholder="message"
                 value={message} onChangeText={(e) => {
                     // input.current?.shake()
@@ -81,12 +101,12 @@ const TakeInput: React.FunctionComponent<{}> = () => {
                 />}
                 onPress={() => {
                     if (message != '') {
-                        addmessage({ variables: { input: { data: message, username: 'Hellowdawdty', roomID: '1234' } } })
+
+                        addmessage({ variables: { input: { data: message, username: username, roomID: roomcode } } })
                         setmessage('')
                     }
                     else {
                         input.current.shake()
-
                     }
                 }} />
         </View>
@@ -130,9 +150,12 @@ const styles = StyleSheet.create({
         color: Colors.light.text,
     },
     usernamecont: {
+        top: 2,
         position: 'absolute',
         backgroundColor: 'transparent',
-        top: -2,
     },
-    usernametext: {}
+    usernametext: {
+        fontSize: 10,
+        fontWeight: '600'
+    }
 })
